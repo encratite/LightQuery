@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Data.SQLite;
 
 namespace LightQuery
@@ -39,21 +40,39 @@ namespace LightQuery
 			}
 		}
 
-		static void HandleDatabase(string path)
+		static void HandleDatabase(string path, string[] lines = null)
 		{
+			const string comment = "--";
 			using (SQLiteConnection connection = new SQLiteConnection(string.Format("Data Source={0}", path)))
 			{
 				connection.Open();
 				string buffer = "";
-				while (true)
+				int lineIndex = 0;
+				while (lines == null || lineIndex < lines.Length)
 				{
-					Console.Write("> ");
-					buffer += Console.ReadLine();
+					string line;
+					if (lines == null)
+					{
+						Console.Write("> ");
+						line = Console.ReadLine();
+					}
+					else
+					{
+						line = lines[lineIndex];
+						lineIndex++;
+					}
+					line = line.Trim();
+					//Skip comments
+					if (line.Length >= comment.Length && line.Substring(0, comment.Length) == comment)
+						continue;
+					buffer += line;
 					int offset = buffer.IndexOf(";");
 					if (offset == -1)
 						continue;
 					string query = buffer.Substring(0, offset).Trim();
 					buffer = buffer.Substring(offset + 1);
+					if (lines != null)
+						Console.WriteLine("Executing: {0}", query);
 					PerformQuery(query, connection);
 				}
 			}
@@ -61,13 +80,29 @@ namespace LightQuery
 
 		static void Main(string[] arguments)
 		{
-			if (arguments.Length != 1)
+			if (arguments.Length < 1 || arguments.Length > 2)
 			{
-				Console.WriteLine("You must specify a database to open");
+				string application = Environment.GetCommandLineArgs()[0];
+				Console.WriteLine("{0} <database>", application);
+				Console.WriteLine("{0} <database> <query script>", application);
 				return;
 			}
-			string path = arguments[0];
-			HandleDatabase(path);
+			string databasePath = arguments[0];
+			if (arguments.Length == 1)
+				HandleDatabase(databasePath);
+			else
+			{
+				string scriptPath = arguments[1];
+				try
+				{
+					string[] lines = File.ReadAllLines(scriptPath);
+					HandleDatabase(databasePath, lines);
+				}
+				catch (IOException exception)
+				{
+					Console.WriteLine(exception.Message);
+				}
+			}
 		}
 	}
 }
