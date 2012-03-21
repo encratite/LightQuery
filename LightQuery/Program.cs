@@ -20,28 +20,32 @@ namespace LightQuery
 				}
 				Console.WriteLine("");
 			}
-			if (reader.RecordsAffected > 0)
-				Console.WriteLine("{0} records affected", reader.RecordsAffected);
 		}
 
-		static void PerformQuery(string query, SQLiteConnection connection)
+		static void PerformQuery(string query, SQLiteConnection connection, bool isManualQuery)
 		{
 			try
 			{
 				using (SQLiteCommand command = new SQLiteCommand(query, connection))
 				{
 					using (SQLiteDataReader reader = command.ExecuteReader())
+					{
 						PrintQueryOutput(reader);
+						if (isManualQuery && reader.RecordsAffected > 0)
+							Console.WriteLine("{0} records affected", reader.RecordsAffected);
+					}
 				}
 			}
 			catch (SQLiteException exception)
 			{
+				Console.WriteLine("Error in query: {0}", query);
 				Console.WriteLine(exception.Message);
 			}
 		}
 
 		static void HandleDatabase(string path, string[] lines = null)
 		{
+			bool isManualQuery = lines == null;
 			const string comment = "--";
 			using (SQLiteConnection connection = new SQLiteConnection(string.Format("Data Source={0}", path)))
 			{
@@ -51,7 +55,7 @@ namespace LightQuery
 				while (lines == null || lineIndex < lines.Length)
 				{
 					string line;
-					if (lines == null)
+					if (isManualQuery)
 					{
 						Console.Write("> ");
 						line = Console.ReadLine();
@@ -71,9 +75,7 @@ namespace LightQuery
 						continue;
 					string query = buffer.Substring(0, offset).Trim();
 					buffer = buffer.Substring(offset + 1);
-					if (lines != null)
-						Console.WriteLine("Executing: {0}", query);
-					PerformQuery(query, connection);
+					PerformQuery(query, connection, isManualQuery);
 				}
 			}
 		}
